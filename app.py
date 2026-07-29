@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-# Configuración Responsive Centrada para Móviles
+# Configuración Móvil Estricta
 st.set_page_config(
     page_title="Copa Bazzini 2026",
     page_icon="🏆",
@@ -9,21 +9,21 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Estilos CSS de Alta Densidad eSports
+# Custom CSS Optimizado para Móviles Táctiles
 st.markdown("""
     <style>
     .stApp { background-color: #0c0e14; color: #f0f6fc; }
     
     .header-container {
         text-align: center;
-        padding: 8px 0 12px 0;
+        padding: 6px 0 10px 0;
         border-bottom: 2px solid #21262d;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
     }
-    .app-title { color: #d4af37; font-size: 1.5rem; font-weight: 900; margin: 0; letter-spacing: 1px; }
+    .app-title { color: #d4af37; font-size: 1.4rem; font-weight: 900; margin: 0; }
     .app-subtitle { color: #8b949e; font-size: 0.7rem; margin-top: 2px; text-transform: uppercase; }
 
-    .block-container { padding-top: 0.6rem !important; padding-bottom: 2rem !important; }
+    .block-container { padding-top: 0.5rem !important; padding-bottom: 2rem !important; }
     
     /* Inputs de Marcador */
     div[data-baseweb="input"] input {
@@ -33,7 +33,7 @@ st.markdown("""
         background-color: #0d0f14 !important;
         border-radius: 6px !important;
         font-size: 1rem !important;
-        padding: 2px 4px !important;
+        padding: 4px !important;
     }
 
     /* Badges de Títulos */
@@ -41,28 +41,33 @@ st.markdown("""
     .badge-sud { background-color: #70d6ff; color: #000; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; }
 
     /* Tarjetas de Eliminatorias */
-    .bracket-card-lib {
+    .match-card {
         background-color: #161b22;
-        border-left: 4px solid #d4af37;
-        border-radius: 6px;
-        padding: 8px 12px;
-        margin-bottom: 10px;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 10px;
+        margin-bottom: 12px;
     }
-    .bracket-card-sud {
-        background-color: #161b22;
-        border-left: 4px solid #70d6ff;
-        border-radius: 6px;
-        padding: 8px 12px;
-        margin-bottom: 10px;
-    }
+    .match-card-lib { border-left: 4px solid #d4af37; }
+    .match-card-sud { border-left: 4px solid #70d6ff; }
+
     .global-badge {
         background-color: #21262d;
-        color: #f0f6fc;
+        color: #d4af37;
         font-size: 0.75rem;
         font-weight: bold;
         padding: 2px 6px;
         border-radius: 4px;
-        float: right;
+    }
+    
+    .fecha-header {
+        color: #8b949e;
+        font-size: 0.8rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        margin-top: 10px;
+        margin-bottom: 4px;
+        border-bottom: 1px solid #21262d;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -83,7 +88,7 @@ if 'fase_actual' not in st.session_state:
 st.markdown("""
     <div class="header-container">
         <div class="app-title">🏆 COPA BAZZINI 2026</div>
-        <div class="app-subtitle">Mobile Tournament Manager</div>
+        <div class="app-subtitle">eSports Tournament Manager</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -117,68 +122,74 @@ else:
                        for eq in st.session_state.equipos[g]} for g in ['A', 'B', 'C', 'D']}
 
     # ------------------------------------------
-    # TAB 1: GRUPOS & CRUCES
+    # TAB 1: GRUPOS & CRUCES (ORGANIZADO POR FECHAS)
     # ------------------------------------------
     with tab_grupos:
         g_selected = st.selectbox("📌 Seleccionar Grupo:", ["Grupo A", "Grupo B", "Grupo C", "Grupo D"], key="sb_grupo")
         g = g_selected[-1]
 
-        st.markdown(f"#### ⚽ Partidos del Grupo {g}")
         for g_code in ['A', 'B', 'C', 'D']:
             eqs_c = st.session_state.equipos[g_code]
-            cruces_c = [
-                (eqs_c[0], eqs_c[1]), (eqs_c[2], eqs_c[3]),
-                (eqs_c[0], eqs_c[2]), (eqs_c[1], eqs_c[3]),
-                (eqs_c[0], eqs_c[3]), (eqs_c[1], eqs_c[2])
+            
+            # Organización por Fechas claras
+            fechas_cruces = [
+                ("Fecha 1", [(eqs_c[0], eqs_c[1]), (eqs_c[2], eqs_c[3])]),
+                ("Fecha 2", [(eqs_c[0], eqs_c[2]), (eqs_c[1], eqs_c[3])]),
+                ("Fecha 3", [(eqs_c[0], eqs_c[3]), (eqs_c[1], eqs_c[2])])
             ]
-            for idx_c, (eq1_c, eq2_c) in enumerate(cruces_c):
+            
+            match_counter = 0
+            for f_nombre, cruces in fechas_cruces:
                 if g_code == g:
-                    col1, col2, col3, col4 = st.columns([4, 2, 2, 4])
-                    col1.markdown(f"<div style='text-align:right; font-weight:bold; font-size:0.85rem;'>{eq1_c}</div>", unsafe_allow_html=True)
-                    g1_in = col2.text_input("G1", key=f"G_{g_code}_{idx_c}_1", label_visibility="collapsed")
-                    g2_in = col3.text_input("G2", key=f"G_{g_code}_{idx_c}_2", label_visibility="collapsed")
-                    col4.markdown(f"<div style='font-weight:bold; font-size:0.85rem;'>{eq2_c}</div>", unsafe_allow_html=True)
-                    st.markdown("<hr style='margin:2px 0; border-color:#21262d;'>", unsafe_allow_html=True)
-                else:
-                    g1_in = st.session_state.get(f"G_{g_code}_{idx_c}_1", "")
-                    g2_in = st.session_state.get(f"G_{g_code}_{idx_c}_2", "")
-
-                if g1_in.isdigit() and g2_in.isdigit():
-                    v1, v2 = int(g1_in), int(g2_in)
-                    tablas_datos[g_code][eq1_c]['PJ'] += 1; tablas_datos[g_code][eq2_c]['PJ'] += 1
-                    tablas_datos[g_code][eq1_c]['GF'] += v1; tablas_datos[g_code][eq1_c]['GC'] += v2
-                    tablas_datos[g_code][eq2_c]['GF'] += v2; tablas_datos[g_code][eq2_c]['GC'] += v1
-
-                    if v1 > v2:
-                        tablas_datos[g_code][eq1_c]['PG'] += 1; tablas_datos[g_code][eq1_c]['PTS'] += 3; tablas_datos[g_code][eq2_c]['PP'] += 1
-                    elif v2 > v1:
-                        tablas_datos[g_code][eq2_c]['PG'] += 1; tablas_datos[g_code][eq2_c]['PTS'] += 3; tablas_datos[g_code][eq1_c]['PP'] += 1
+                    st.markdown(f"<div class='fecha-header'>📌 {f_nombre}</div>", unsafe_allow_html=True)
+                
+                for eq1_c, eq2_c in cruces:
+                    if g_code == g:
+                        st.markdown(f"<div style='font-size:0.85rem; font-weight:bold; margin-bottom:2px;'>{eq1_c} vs {eq2_c}</div>", unsafe_allow_html=True)
+                        c1, c2 = st.columns(2)
+                        g1_in = c1.text_input(f"G1", key=f"G_{g_code}_{match_counter}_1", placeholder=f"Goles {eq1_c}", label_visibility="collapsed")
+                        g2_in = c2.text_input(f"G2", key=f"G_{g_code}_{match_counter}_2", placeholder=f"Goles {eq2_c}", label_visibility="collapsed")
                     else:
-                        tablas_datos[g_code][eq1_c]['PE'] += 1; tablas_datos[g_code][eq1_c]['PTS'] += 1
-                        tablas_datos[g_code][eq2_c]['PE'] += 1; tablas_datos[g_code][eq2_c]['PTS'] += 1
+                        g1_in = st.session_state.get(f"G_{g_code}_{match_counter}_1", "")
+                        g2_in = st.session_state.get(f"G_{g_code}_{match_counter}_2", "")
 
-                    tablas_datos[g_code][eq1_c]['DG'] = tablas_datos[g_code][eq1_c]['GF'] - tablas_datos[g_code][eq1_c]['GC']
-                    tablas_datos[g_code][eq2_c]['DG'] = tablas_datos[g_code][eq2_c]['GF'] - tablas_datos[g_code][eq2_c]['GC']
+                    if g1_in.isdigit() and g2_in.isdigit():
+                        v1, v2 = int(g1_in), int(g2_in)
+                        tablas_datos[g_code][eq1_c]['PJ'] += 1; tablas_datos[g_code][eq2_c]['PJ'] += 1
+                        tablas_datos[g_code][eq1_c]['GF'] += v1; tablas_datos[g_code][eq1_c]['GC'] += v2
+                        tablas_datos[g_code][eq2_c]['GF'] += v2; tablas_datos[g_code][eq2_c]['GC'] += v1
 
-        st.markdown(f"#### 📋 Posiciones - Grupo {g}")
+                        if v1 > v2:
+                            tablas_datos[g_code][eq1_c]['PG'] += 1; tablas_datos[g_code][eq1_c]['PTS'] += 3; tablas_datos[g_code][eq2_c]['PP'] += 1
+                        elif v2 > v1:
+                            tablas_datos[g_code][eq2_c]['PG'] += 1; tablas_datos[g_code][eq2_c]['PTS'] += 3; tablas_datos[g_code][eq1_c]['PP'] += 1
+                        else:
+                            tablas_datos[g_code][eq1_c]['PE'] += 1; tablas_datos[g_code][eq1_c]['PTS'] += 1
+                            tablas_datos[g_code][eq2_c]['PE'] += 1; tablas_datos[g_code][eq2_c]['PTS'] += 1
+
+                        tablas_datos[g_code][eq1_c]['DG'] = tablas_datos[g_code][eq1_c]['GF'] - tablas_datos[g_code][eq1_c]['GC']
+                        tablas_datos[g_code][eq2_c]['DG'] = tablas_datos[g_code][eq2_c]['GF'] - tablas_datos[g_code][eq2_c]['GC']
+                    
+                    match_counter += 1
+
+        st.markdown(f"#### 📋 Tabla de Posiciones - Grupo {g}")
         df = pd.DataFrame.from_dict(tablas_datos[g], orient='index')
         df = df.sort_values(by=['PTS', 'DG', 'GF'], ascending=False)
         st.dataframe(df[['PTS', 'PJ', 'DG', 'GF', 'GC']], use_container_width=True)
 
-        # CÁLCULO CORRECTO DE CLASIFICADOS SIN INDEX ERROR
         clasificados_lib, clasificados_sud = {}, {}
         for g_c in ['A', 'B', 'C', 'D']:
             df_c = pd.DataFrame.from_dict(tablas_datos[g_c], orient='index')
             df_c = df_c.sort_values(by=['PTS', 'DG', 'GF'], ascending=False)
-            
-            # Guardamos la lista entera de 4 equipos
             equipos_ordenados = df_c.index.tolist()
-            clasificados_lib[g_c] = [equipos_ordenados[0], equipos_ordenados[1]] # 1° y 2° -> Libertadores
-            clasificados_sud[g_c] = [equipos_ordenados[2], equipos_ordenados[3]] # 3° y 4° -> Sudamericana
+            clasificados_lib[g_c] = [equipos_ordenados[0], equipos_ordenados[1]]
+            clasificados_sud[g_c] = [equipos_ordenados[2], equipos_ordenados[3]]
 
-    # Función auxiliar para renderizar cada llave súper clara
-    def renderizar_llave(copa_prefix, idx, eq1, eq2, es_doble=True):
-        st.markdown(f"<div class='bracket-card-{copa_prefix.lower()[:3]}'>", unsafe_allow_html=True)
+    # ------------------------------------------
+    # FUNCIÓN RENDERIZAR ELIMINATORIAS (EQUIPOS ARRIBA / INPUTS ABAJO)
+    # ------------------------------------------
+    def renderizar_llave_movil(copa_prefix, idx, eq1, eq2, es_doble=True):
+        css_class = "match-card-lib" if "LIB" in copa_prefix else "match-card-sud"
         
         i1 = st.session_state.get(f"{copa_prefix}_{idx}_i1", "")
         i2 = st.session_state.get(f"{copa_prefix}_{idx}_i2", "")
@@ -194,33 +205,35 @@ else:
             elif tot2 > tot1: ganador = eq2
             else: ganador = f"{eq1} (Pen)"
 
-        # Estilos de ganadores resaltados en verde
         st1 = "color:#2ea44f; font-weight:bold;" if ganador == eq1 else "font-weight:bold;"
         st2 = "color:#2ea44f; font-weight:bold;" if ganador == eq2 else "font-weight:bold;"
 
         st.markdown(f"""
-            <div style='margin-bottom:6px;'>
-                <span style='font-size:0.8rem; color:#8b949e;'>Llave {idx+1}</span>
-                <span class='global-badge'>Global: {tot1} - {tot2}</span>
-            </div>
-            <div style='display:flex; justify-content:space-between; margin-bottom:6px;'>
-                <span style='{st1}'>{eq1}</span>
-                <span style='{st2}'>{eq2}</span>
+            <div class='match-card {css_class}'>
+                <div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;'>
+                    <span style='font-size:0.8rem; color:#8b949e; font-weight:bold;'>LLAVE {idx+1}</span>
+                    <span class='global-badge'>GLOBAL: {tot1} - {tot2}</span>
+                </div>
+                <div style='font-size:0.95rem; margin-bottom:8px;'>
+                    <span style='{st1}'>{eq1}</span> <span style='color:#8b949e;'>vs</span> <span style='{st2}'>{eq2}</span>
+                </div>
             </div>
         """, unsafe_allow_html=True)
 
         if es_doble:
+            st.caption("⚽ Resultados: Ida y Vuelta")
             c1, c2, c3, c4 = st.columns(4)
-            c1.text_input("I1", key=f"{copa_prefix}_{idx}_i1", placeholder="Ida 1", label_visibility="collapsed")
-            c2.text_input("I2", key=f"{copa_prefix}_{idx}_i2", placeholder="Ida 2", label_visibility="collapsed")
-            c3.text_input("V1", key=f"{copa_prefix}_{idx}_v1", placeholder="Vue 1", label_visibility="collapsed")
-            c4.text_input("V2", key=f"{copa_prefix}_{idx}_v2", placeholder="Vue 2", label_visibility="collapsed")
+            c1.text_input("I1", key=f"{copa_prefix}_{idx}_i1", placeholder="Ida L", label_visibility="collapsed")
+            c2.text_input("I2", key=f"{copa_prefix}_{idx}_i2", placeholder="Ida V", label_visibility="collapsed")
+            c3.text_input("V1", key=f"{copa_prefix}_{idx}_v1", placeholder="Vue L", label_visibility="collapsed")
+            c4.text_input("V2", key=f"{copa_prefix}_{idx}_v2", placeholder="Vue V", label_visibility="collapsed")
         else:
+            st.caption("⚽ Resultado: Final Única")
             c1, c2 = st.columns(2)
-            c1.text_input("I1", key=f"{copa_prefix}_{idx}_i1", placeholder="Final 1", label_visibility="collapsed")
-            c2.text_input("I2", key=f"{copa_prefix}_{idx}_i2", placeholder="Final 2", label_visibility="collapsed")
+            c1.text_input("I1", key=f"{copa_prefix}_{idx}_i1", placeholder="Goles 1", label_visibility="collapsed")
+            c2.text_input("I2", key=f"{copa_prefix}_{idx}_i2", placeholder="Goles 2", label_visibility="collapsed")
 
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin:12px 0; border-color:#21262d;'>", unsafe_allow_html=True)
         return ganador
 
     # ------------------------------------------
@@ -242,7 +255,7 @@ else:
         ganadores_cuartos_lib = []
         with sub_lib_c:
             for idx, (eq1, eq2) in enumerate(cruces_lib):
-                g = renderizar_llave("LIB_C", idx, eq1, eq2, es_doble=True)
+                g = renderizar_llave_movil("LIB_C", idx, eq1, eq2, es_doble=True)
                 ganadores_cuartos_lib.append(g)
 
         ganadores_semis_lib = []
@@ -250,13 +263,13 @@ else:
             s_eq1, s_eq2 = ganadores_cuartos_lib[0], ganadores_cuartos_lib[1]
             s_eq3, s_eq4 = ganadores_cuartos_lib[2], ganadores_cuartos_lib[3]
             
-            g1 = renderizar_llave("LIB_S", 0, s_eq1, s_eq2, es_doble=True)
-            g2 = renderizar_llave("LIB_S", 1, s_eq3, s_eq4, es_doble=True)
+            g1 = renderizar_llave_movil("LIB_S", 0, s_eq1, s_eq2, es_doble=True)
+            g2 = renderizar_llave_movil("LIB_S", 1, s_eq3, s_eq4, es_doble=True)
             ganadores_semis_lib.extend([g1, g2])
 
         with sub_lib_f:
             f_eq1, f_eq2 = ganadores_semis_lib[0], ganadores_semis_lib[1]
-            campeon = renderizar_llave("LIB_F", 0, f_eq1, f_eq2, es_doble=False)
+            campeon = renderizar_llave_movil("LIB_F", 0, f_eq1, f_eq2, es_doble=False)
             if campeon != "Por definir":
                 st.balloons()
                 st.success(f"🏆 ¡CAMPEÓN COPA LIBERTADORES 2026: {campeon}! 🏆")
@@ -270,18 +283,17 @@ else:
 
         sub_sud_c, sub_sud_s, sub_sud_f = st.tabs(["🟦 Cuartos", "🔥 Semis", "👑 Final"])
 
-        # CRUCES CORRECTOS PARA EL 3° Y 4° DE CADA GRUPO
         cruces_sud = [
-            (clasificados_sud['A'][0], clasificados_sud['B'][1]), # 3°A vs 4°B
-            (clasificados_sud['C'][0], clasificados_sud['D'][1]), # 3°C vs 4°D
-            (clasificados_sud['B'][0], clasificados_sud['A'][1]), # 3°B vs 4°A
-            (clasificados_sud['D'][0], clasificados_sud['C'][1])  # 3°D vs 4°C
+            (clasificados_sud['A'][0], clasificados_sud['B'][1]),
+            (clasificados_sud['C'][0], clasificados_sud['D'][1]),
+            (clasificados_sud['B'][0], clasificados_sud['A'][1]),
+            (clasificados_sud['D'][0], clasificados_sud['C'][1])
         ]
         
         ganadores_cuartos_sud = []
         with sub_sud_c:
             for idx, (eq1, eq2) in enumerate(cruces_sud):
-                g = renderizar_llave("SUD_C", idx, eq1, eq2, es_doble=True)
+                g = renderizar_llave_movil("SUD_C", idx, eq1, eq2, es_doble=True)
                 ganadores_cuartos_sud.append(g)
 
         ganadores_semis_sud = []
@@ -289,13 +301,13 @@ else:
             s_eq1, s_eq2 = ganadores_cuartos_sud[0], ganadores_cuartos_sud[1]
             s_eq3, s_eq4 = ganadores_cuartos_sud[2], ganadores_cuartos_sud[3]
             
-            g1 = renderizar_llave("SUD_S", 0, s_eq1, s_eq2, es_doble=True)
-            g2 = renderizar_llave("SUD_S", 1, s_eq3, s_eq4, es_doble=True)
+            g1 = renderizar_llave_movil("SUD_S", 0, s_eq1, s_eq2, es_doble=True)
+            g2 = renderizar_llave_movil("SUD_S", 1, s_eq3, s_eq4, es_doble=True)
             ganadores_semis_sud.extend([g1, g2])
 
         with sub_sud_f:
             f_eq1, f_eq2 = ganadores_semis_sud[0], ganadores_semis_sud[1]
-            campeon_sud = renderizar_llave("SUD_F", 0, f_eq1, f_eq2, es_doble=False)
+            campeon_sud = renderizar_llave_movil("SUD_F", 0, f_eq1, f_eq2, es_doble=False)
             if campeon_sud != "Por definir":
                 st.balloons()
                 st.info(f"🥈 ¡CAMPEÓN COPA SUDAMERICANA 2026: {campeon_sud}! 🥈")
