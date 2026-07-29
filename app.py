@@ -1,3 +1,19 @@
+import sys
+import subprocess
+
+# Auto-instalador de supabase si Streamlit Cloud no lo detectó
+try:
+    from supabase import create_client, Client
+except ModuleNotFoundError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "supabase"])
+    from supabase import create_client, Client
+
+import streamlit as st
+import pandas as pd
+
+# Configuración Móvil Estricta
+st.set_page_config(
+...
 import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
