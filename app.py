@@ -1,7 +1,7 @@
 import sys
 import subprocess
 
-# Auto-instalador de supabase si Streamlit Cloud no lo detectó
+# Auto-instalación de supabase si falta la librería en el servidor
 try:
     from supabase import create_client, Client
 except ModuleNotFoundError:
@@ -10,13 +10,6 @@ except ModuleNotFoundError:
 
 import streamlit as st
 import pandas as pd
-
-# Configuración Móvil Estricta
-st.set_page_config(
-...
-import streamlit as st
-import pandas as pd
-from supabase import create_client, Client
 
 # Configuración Móvil Estricta
 st.set_page_config(
@@ -396,7 +389,7 @@ else:
         ganadores_semis_sud = []
         with sub_sud_s:
             s_eq1, s_eq2 = ganadores_cuartos_sud[0], ganadores_cuartos_sud[1]
-            s_eq3, s_eq4 = ganadores_cuartos_sud[2], ganadores_cuartos_sud[3]
+            s_eq3, s_eq4 = ganadores_semis_sud[2], ganadores_semis_sud[3]
             
             g1 = renderizar_llave_movil("SUD_S", 0, s_eq1, s_eq2, es_doble=True)
             g2 = renderizar_llave_movil("SUD_S", 1, s_eq3, s_eq4, es_doble=True)
