@@ -27,7 +27,7 @@ st.markdown("""
 
     .block-container { padding-top: 0.5rem !important; padding-bottom: 2rem !important; }
     
-    /* Inputs de Marcador */
+    /* Inputs de Marcador - Optimizados para numérico corto */
     div[data-baseweb="input"] input {
         text-align: center !important;
         font-weight: 800 !important;
@@ -36,6 +36,13 @@ st.markdown("""
         border-radius: 6px !important;
         font-size: 1rem !important;
         padding: 4px !important;
+    }
+
+    /* Ocultar flechas numéricas en móviles/navegadores */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+        -webkit-appearance: none; 
+        margin: 0; 
     }
 
     /* Badges de Títulos */
@@ -126,6 +133,10 @@ def guardar_datos_disco(data):
     except Exception as e:
         st.error(f"Error al guardar datos: {e}")
 
+# Función para validar solo números de 1 o 2 cifras
+def es_gol_valido(val):
+    return val == "" or (val.isdigit() and 1 <= len(val) <= 2)
+
 # Cargar datos al iniciar la app
 if 'torneo_data' not in st.session_state:
     st.session_state.torneo_data = cargar_datos_disco()
@@ -133,13 +144,14 @@ if 'torneo_data' not in st.session_state:
 if 'es_editor' not in st.session_state:
     st.session_state.es_editor = False
 
+# INICIALIZAMOS CON 'login' COMO PRIMERA PANTALLA
 if 'fase_actual' not in st.session_state:
-    st.session_state.fase_actual = 'torneo'
+    st.session_state.fase_actual = 'login'
 
 equipos = st.session_state.torneo_data["equipos"]
 datos_db = st.session_state.torneo_data["partidos"]
 
-# Header con Indicador de Sesión
+# Header Principal (Se muestra en todas las pantallas)
 role_class = "role-editor" if st.session_state.es_editor else "role-viewer"
 role_text = f"ADMIN: {st.session_state.get('usuario_admin', '')}" if st.session_state.es_editor else "MODO ESPECTADOR"
 
@@ -150,16 +162,50 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-c_ref1, c_ref2 = st.columns([7, 3])
-with c_ref2:
-    if st.button("🔄 Actualizar", use_container_width=True):
-        st.session_state.torneo_data = cargar_datos_disco()
-        st.rerun()
+# ------------------------------------------
+# 0. PANTALLA INICIAL: INICIO DE SESIÓN
+# ------------------------------------------
+if st.session_state.fase_actual == 'login':
+    st.markdown("<h4 style='text-align: center; color: #d4af37; margin-top: 15px;'>Bienvenido al Torneo</h4>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; font-size: 0.85rem; color: #8b949e; margin-bottom: 20px;'>Seleccioná cómo querés ingresar al sistema</p>", unsafe_allow_html=True)
+
+    tab_invitado, tab_admin = st.tabs(["👁️ Modo Invitado", "🔐 Modo Administrador"])
+
+    with tab_invitado:
+        st.info("Podrás ver las tablas de posiciones y los resultados actualizados en tiempo real sin posibilidad de modificarlos.")
+        if st.button("🚀 Entrar como Invitado", use_container_width=True, type="primary"):
+            st.session_state.es_editor = False
+            st.session_state.usuario_admin = None
+            st.session_state.fase_actual = 'torneo'
+            st.rerun()
+
+    with tab_admin:
+        user_select = st.selectbox(
+            "Seleccioná tu Usuario Admin:",
+            ["admin", "adminpausa", "adminchaca"]
+        )
+        pin_input = st.text_input(f"Contraseña de {user_select}:", type="password")
+        
+        if st.button("🔑 Iniciar Sesión como Admin", use_container_width=True, type="primary"):
+            pins = {
+                "admin": st.secrets.get("ADMIN_PIN", "admin123"),
+                "adminpausa": st.secrets.get("ADMIN_PAUSA_PIN", "pausa123"),
+                "adminchaca": st.secrets.get("ADMIN_CHACA_PIN", "chaca123")
+            }
+            
+            if pin_input == pins.get(user_select):
+                st.session_state.es_editor = True
+                st.session_state.usuario_admin = user_select
+                st.session_state.fase_actual = 'torneo'
+                st.success(f"¡Bienvenido, {user_select}!")
+                st.rerun()
+            else:
+                st.error("Contraseña incorrecta")
 
 # ------------------------------------------
 # 1. PANTALLA CONFIGURACIÓN DE EQUIPOS
 # ------------------------------------------
-if st.session_state.fase_actual == 'config' and st.session_state.es_editor:
+elif st.session_state.fase_actual == 'config' and st.session_state.es_editor:
     st.subheader("⚙️ Configuración de Equipos")
     grupo_sel = st.radio("Editar Grupo:", ["Grupo A", "Grupo B", "Grupo C", "Grupo D"], horizontal=True)
     g_key = grupo_sel[-1]
@@ -183,6 +229,12 @@ if st.session_state.fase_actual == 'config' and st.session_state.es_editor:
 # 2. DASHBOARD TORNEO (GRUPOS & LLAVES)
 # ------------------------------------------
 else:
+    c_ref1, c_ref2 = st.columns([7, 3])
+    with c_ref2:
+        if st.button("🔄 Actualizar", use_container_width=True):
+            st.session_state.torneo_data = cargar_datos_disco()
+            st.rerun()
+
     tab_grupos, tab_lib, tab_sud = st.tabs(["📊 Grupos", "🏆 Libertadores", "🥈 Sudamericana"])
 
     tablas_datos = {g: {eq: {'PTS': 0, 'PJ': 0, 'PG': 0, 'PE': 0, 'PP': 0, 'GF': 0, 'GC': 0, 'DG': 0} 
@@ -213,15 +265,15 @@ else:
                         st.markdown(f"<div style='font-size:0.85rem; font-weight:bold; margin-bottom:2px;'>{eq1_c} vs {eq2_c}</div>", unsafe_allow_html=True)
                         c1, c2 = st.columns(2)
                         
-                        in_g1 = c1.text_input("G1", value=val_g1, key=f"ui_{key_g1}", placeholder=f"Goles {eq1_c}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
-                        in_g2 = c2.text_input("G2", value=val_g2, key=f"ui_{key_g2}", placeholder=f"Goles {eq2_c}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                        in_g1 = c1.text_input("G1", value=val_g1, key=f"ui_{key_g1}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                        in_g2 = c2.text_input("G2", value=val_g2, key=f"ui_{key_g2}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                         if st.session_state.es_editor:
                             hubo_cambio = False
-                            if in_g1 != val_g1:
+                            if in_g1 != val_g1 and es_gol_valido(in_g1):
                                 st.session_state.torneo_data["partidos"][key_g1] = in_g1
                                 hubo_cambio = True
-                            if in_g2 != val_g2:
+                            if in_g2 != val_g2 and es_gol_valido(in_g2):
                                 st.session_state.torneo_data["partidos"][key_g2] = in_g2
                                 hubo_cambio = True
                             if hubo_cambio:
@@ -302,20 +354,20 @@ else:
             if es_doble:
                 st.markdown("<div class='input-label-row'>⚽ Partido de Ida</div>", unsafe_allow_html=True)
                 c1, c2 = st.columns(2)
-                ui_i1 = c1.text_input("I1", value=i1, key=f"ui_{k_i1}", placeholder=f"Goles {eq1}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
-                ui_i2 = c2.text_input("I2", value=i2, key=f"ui_{k_i2}", placeholder=f"Goles {eq2}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_i1 = c1.text_input("I1", value=i1, key=f"ui_{k_i1}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_i2 = c2.text_input("I2", value=i2, key=f"ui_{k_i2}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                 st.markdown("<div class='input-label-row'>⚽ Partido de Vuelta</div>", unsafe_allow_html=True)
                 c3, c4 = st.columns(2)
-                ui_v1 = c3.text_input("V1", value=v1, key=f"ui_{k_v1}", placeholder=f"Goles {eq1}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
-                ui_v2 = c4.text_input("V2", value=v2, key=f"ui_{k_v2}", placeholder=f"Goles {eq2}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_v1 = c3.text_input("V1", value=v1, key=f"ui_{k_v1}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_v2 = c4.text_input("V2", value=v2, key=f"ui_{k_v2}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                 if st.session_state.es_editor:
                     hubo_cambio = False
-                    if ui_i1 != i1: st.session_state.torneo_data["partidos"][k_i1] = ui_i1; hubo_cambio = True
-                    if ui_i2 != i2: st.session_state.torneo_data["partidos"][k_i2] = ui_i2; hubo_cambio = True
-                    if ui_v1 != v1: st.session_state.torneo_data["partidos"][k_v1] = ui_v1; hubo_cambio = True
-                    if ui_v2 != v2: st.session_state.torneo_data["partidos"][k_v2] = ui_v2; hubo_cambio = True
+                    if ui_i1 != i1 and es_gol_valido(ui_i1): st.session_state.torneo_data["partidos"][k_i1] = ui_i1; hubo_cambio = True
+                    if ui_i2 != i2 and es_gol_valido(ui_i2): st.session_state.torneo_data["partidos"][k_i2] = ui_i2; hubo_cambio = True
+                    if ui_v1 != v1 and es_gol_valido(ui_v1): st.session_state.torneo_data["partidos"][k_v1] = ui_v1; hubo_cambio = True
+                    if ui_v2 != v2 and es_gol_valido(ui_v2): st.session_state.torneo_data["partidos"][k_v2] = ui_v2; hubo_cambio = True
                     if hubo_cambio:
                         guardar_datos_disco(st.session_state.torneo_data)
                         st.rerun()
@@ -323,13 +375,13 @@ else:
             else:
                 st.markdown("<div class='input-label-row'>👑 Gran Final Única</div>", unsafe_allow_html=True)
                 c1, c2 = st.columns(2)
-                ui_i1 = c1.text_input("I1", value=i1, key=f"ui_{k_i1}", placeholder=f"Goles {eq1}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
-                ui_i2 = c2.text_input("I2", value=i2, key=f"ui_{k_i2}", placeholder=f"Goles {eq2}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_i1 = c1.text_input("I1", value=i1, key=f"ui_{k_i1}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_i2 = c2.text_input("I2", value=i2, key=f"ui_{k_i2}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                 if st.session_state.es_editor:
                     hubo_cambio = False
-                    if ui_i1 != i1: st.session_state.torneo_data["partidos"][k_i1] = ui_i1; hubo_cambio = True
-                    if ui_i2 != i2: st.session_state.torneo_data["partidos"][k_i2] = ui_i2; hubo_cambio = True
+                    if ui_i1 != i1 and es_gol_valido(ui_i1): st.session_state.torneo_data["partidos"][k_i1] = ui_i1; hubo_cambio = True
+                    if ui_i2 != i2 and es_gol_valido(ui_i2): st.session_state.torneo_data["partidos"][k_i2] = ui_i2; hubo_cambio = True
                     if hubo_cambio:
                         guardar_datos_disco(st.session_state.torneo_data)
                         st.rerun()
@@ -409,33 +461,12 @@ else:
                 st.info(f"🥈 ¡CAMPEÓN COPA SUDAMERICANA 2026: {campeon_sud}! 🥈")
 
     # ------------------------------------------
-    # FOOTER DE AUTENTICACIÓN ADMIN MULTI-USUARIO
+    # FOOTER DE SESIÓN Y CONTROLES ADMIN
     # ------------------------------------------
     st.markdown("---")
-    with st.expander("🔐 Control de Administrador"):
-        if not st.session_state.es_editor:
-            user_select = st.selectbox(
-                "Seleccioná tu Usuario Admin:",
-                ["admin", "adminpausa", "adminchaca"]
-            )
-            pin_input = st.text_input(f"Contraseña de {user_select}:", type="password")
-            
-            if st.button("Iniciar Sesión Admin", use_container_width=True):
-                pins = {
-                    "admin": st.secrets.get("ADMIN_PIN", "admin123"),
-                    "adminpausa": st.secrets.get("ADMIN_PAUSA_PIN", "pausa123"),
-                    "adminchaca": st.secrets.get("ADMIN_CHACA_PIN", "chaca123")
-                }
-                
-                if pin_input == pins.get(user_select):
-                    st.session_state.es_editor = True
-                    st.session_state.usuario_admin = user_select
-                    st.success(f"¡Bienvenido, {user_select}!")
-                    st.rerun()
-                else:
-                    st.error("Contraseña incorrecta")
-        else:
-            st.info(f"👤 Sesión activa: **{st.session_state.get('usuario_admin', 'Admin')}**")
+    with st.expander("🔐 Gestión de Sesión y Acceso"):
+        if st.session_state.es_editor:
+            st.info(f"👤 Sesión de Editor activa: **{st.session_state.get('usuario_admin', 'Admin')}**")
             col_ad1, col_ad2 = st.columns(2)
             with col_ad1:
                 if st.button("⚙️ Editar Equipos", use_container_width=True):
@@ -445,4 +476,10 @@ else:
                 if st.button("🔒 Cerrar Sesión", use_container_width=True):
                     st.session_state.es_editor = False
                     st.session_state.usuario_admin = None
+                    st.session_state.fase_actual = 'login'
                     st.rerun()
+        else:
+            st.info("👤 Estás navegando como **Invitado (Sólo Lectura)**.")
+            if st.button("🔄 Volver al Inicio / Cambiar de Sesión", use_container_width=True):
+                st.session_state.fase_actual = 'login'
+                st.rerun()
