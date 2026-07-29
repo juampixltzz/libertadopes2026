@@ -18,7 +18,7 @@ st.markdown("""
         text-align: center;
         padding: 6px 0 10px 0;
         border-bottom: 2px solid #21262d;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
     }
     .app-title { color: #d4af37; font-size: 1.4rem; font-weight: 900; margin: 0; }
     .app-subtitle { color: #8b949e; font-size: 0.7rem; margin-top: 2px; text-transform: uppercase; }
@@ -40,23 +40,30 @@ st.markdown("""
     .badge-lib { background-color: #d4af37; color: #000; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; }
     .badge-sud { background-color: #70d6ff; color: #000; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; }
 
-    /* Tarjetas de Eliminatorias */
-    .match-card {
+    /* Tarjetas de Eliminatorias bien divididas */
+    .match-card-lib {
         background-color: #161b22;
         border: 1px solid #30363d;
+        border-left: 5px solid #d4af37;
         border-radius: 8px;
-        padding: 10px;
-        margin-bottom: 12px;
+        padding: 12px;
+        margin-bottom: 15px;
     }
-    .match-card-lib { border-left: 4px solid #d4af37; }
-    .match-card-sud { border-left: 4px solid #70d6ff; }
+    .match-card-sud {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-left: 5px solid #70d6ff;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 15px;
+    }
 
     .global-badge {
         background-color: #21262d;
         color: #d4af37;
-        font-size: 0.75rem;
+        font-size: 0.8rem;
         font-weight: bold;
-        padding: 2px 6px;
+        padding: 3px 8px;
         border-radius: 4px;
     }
     
@@ -66,8 +73,16 @@ st.markdown("""
         font-weight: bold;
         text-transform: uppercase;
         margin-top: 10px;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
         border-bottom: 1px solid #21262d;
+    }
+
+    .input-label-row {
+        font-size: 0.75rem;
+        color: #8b949e;
+        font-weight: bold;
+        margin-top: 6px;
+        margin-bottom: 2px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -122,16 +137,15 @@ else:
                        for eq in st.session_state.equipos[g]} for g in ['A', 'B', 'C', 'D']}
 
     # ------------------------------------------
-    # TAB 1: GRUPOS & CRUCES (ORGANIZADO POR FECHAS)
+    # TAB 1: GRUPOS & CRUCES (SELECTOR HORIZONTAL)
     # ------------------------------------------
     with tab_grupos:
-        g_selected = st.selectbox("📌 Seleccionar Grupo:", ["Grupo A", "Grupo B", "Grupo C", "Grupo D"], key="sb_grupo")
+        g_selected = st.radio("📌 Seleccionar Grupo:", ["Grupo A", "Grupo B", "Grupo C", "Grupo D"], horizontal=True, key="radio_grupo")
         g = g_selected[-1]
 
         for g_code in ['A', 'B', 'C', 'D']:
             eqs_c = st.session_state.equipos[g_code]
             
-            # Organización por Fechas claras
             fechas_cruces = [
                 ("Fecha 1", [(eqs_c[0], eqs_c[1]), (eqs_c[2], eqs_c[3])]),
                 ("Fecha 2", [(eqs_c[0], eqs_c[2]), (eqs_c[1], eqs_c[3])]),
@@ -186,7 +200,7 @@ else:
             clasificados_sud[g_c] = [equipos_ordenados[2], equipos_ordenados[3]]
 
     # ------------------------------------------
-    # FUNCIÓN RENDERIZAR ELIMINATORIAS (EQUIPOS ARRIBA / INPUTS ABAJO)
+    # RENDERIZADOR DE ELIMINATORIAS (TARJETAS INDEPENDIENTES)
     # ------------------------------------------
     def renderizar_llave_movil(copa_prefix, idx, eq1, eq2, es_doble=True):
         css_class = "match-card-lib" if "LIB" in copa_prefix else "match-card-sud"
@@ -208,32 +222,37 @@ else:
         st1 = "color:#2ea44f; font-weight:bold;" if ganador == eq1 else "font-weight:bold;"
         st2 = "color:#2ea44f; font-weight:bold;" if ganador == eq2 else "font-weight:bold;"
 
-        st.markdown(f"""
-            <div class='match-card {css_class}'>
-                <div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;'>
-                    <span style='font-size:0.8rem; color:#8b949e; font-weight:bold;'>LLAVE {idx+1}</span>
-                    <span class='global-badge'>GLOBAL: {tot1} - {tot2}</span>
-                </div>
-                <div style='font-size:0.95rem; margin-bottom:8px;'>
-                    <span style='{st1}'>{eq1}</span> <span style='color:#8b949e;'>vs</span> <span style='{st2}'>{eq2}</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+        # Contenedor aislado para cada cruce
+        with st.container():
+            st.markdown(f"""
+                <div class='{css_class}'>
+                    <div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;'>
+                        <span style='font-size:0.8rem; color:#8b949e; font-weight:bold;'>LLAVE {idx+1}</span>
+                        <span class='global-badge'>GLOBAL: {tot1} - {tot2}</span>
+                    </div>
+                    <div style='font-size:1rem; margin-bottom:10px;'>
+                        <span style='{st1}'>{eq1}</span> <span style='color:#8b949e;'>vs</span> <span style='{st2}'>{eq2}</span>
+                    </div>
+            """, unsafe_allow_html=True)
 
-        if es_doble:
-            st.caption("⚽ Resultados: Ida y Vuelta")
-            c1, c2, c3, c4 = st.columns(4)
-            c1.text_input("I1", key=f"{copa_prefix}_{idx}_i1", placeholder="Ida L", label_visibility="collapsed")
-            c2.text_input("I2", key=f"{copa_prefix}_{idx}_i2", placeholder="Ida V", label_visibility="collapsed")
-            c3.text_input("V1", key=f"{copa_prefix}_{idx}_v1", placeholder="Vue L", label_visibility="collapsed")
-            c4.text_input("V2", key=f"{copa_prefix}_{idx}_v2", placeholder="Vue V", label_visibility="collapsed")
-        else:
-            st.caption("⚽ Resultado: Final Única")
-            c1, c2 = st.columns(2)
-            c1.text_input("I1", key=f"{copa_prefix}_{idx}_i1", placeholder="Goles 1", label_visibility="collapsed")
-            c2.text_input("I2", key=f"{copa_prefix}_{idx}_i2", placeholder="Goles 2", label_visibility="collapsed")
+            if es_doble:
+                st.markdown("<div class='input-label-row'>⚽ Partido de Ida</div>", unsafe_allow_html=True)
+                c1, c2 = st.columns(2)
+                c1.text_input("I1", key=f"{copa_prefix}_{idx}_i1", placeholder=f"Goles {eq1}", label_visibility="collapsed")
+                c2.text_input("I2", key=f"{copa_prefix}_{idx}_i2", placeholder=f"Goles {eq2}", label_visibility="collapsed")
 
-        st.markdown("<hr style='margin:12px 0; border-color:#21262d;'>", unsafe_allow_html=True)
+                st.markdown("<div class='input-label-row'>⚽ Partido de Vuelta</div>", unsafe_allow_html=True)
+                c3, c4 = st.columns(2)
+                c3.text_input("V1", key=f"{copa_prefix}_{idx}_v1", placeholder=f"Goles {eq1}", label_visibility="collapsed")
+                c4.text_input("V2", key=f"{copa_prefix}_{idx}_v2", placeholder=f"Goles {eq2}", label_visibility="collapsed")
+            else:
+                st.markdown("<div class='input-label-row'>👑 Gran Final Única</div>", unsafe_allow_html=True)
+                c1, c2 = st.columns(2)
+                c1.text_input("I1", key=f"{copa_prefix}_{idx}_i1", placeholder=f"Goles {eq1}", label_visibility="collapsed")
+                c2.text_input("I2", key=f"{copa_prefix}_{idx}_i2", placeholder=f"Goles {eq2}", label_visibility="collapsed")
+
+            st.markdown("</div>", unsafe_allow_html=True)
+        
         return ganador
 
     # ------------------------------------------
