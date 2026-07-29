@@ -395,7 +395,7 @@ else:
         ganadores_semis_sud = []
         with sub_sud_s:
             s_eq1, s_eq2 = ganadores_cuartos_sud[0], ganadores_cuartos_sud[1]
-            s_eq3, s_eq4 = ganadores_semis_sud[2], ganadores_semis_sud[3]
+            s_eq3, s_eq4 = ganadores_cuartos_sud[2], ganadores_cuartos_sud[3]
             
             g1 = renderizar_llave_movil("SUD_S", 0, s_eq1, s_eq2, es_doble=True)
             g2 = renderizar_llave_movil("SUD_S", 1, s_eq3, s_eq4, es_doble=True)
