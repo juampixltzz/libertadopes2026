@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+from itertools import groupby
 
 # Configuración Móvil Estricta
 st.set_page_config(
@@ -27,7 +28,7 @@ st.markdown("""
 
     .block-container { padding-top: 0.5rem !important; padding-bottom: 2rem !important; }
     
-    /* Inputs de Marcador */
+    /* Inputs de Marcador - Optimizados para numérico corto */
     div[data-baseweb="input"] input {
         text-align: center !important;
         font-weight: 800 !important;
@@ -36,6 +37,13 @@ st.markdown("""
         border-radius: 6px !important;
         font-size: 1rem !important;
         padding: 4px !important;
+    }
+
+    /* Ocultar flechas numéricas en móviles/navegadores */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+        -webkit-appearance: none; 
+        margin: 0; 
     }
 
     /* Badges de Títulos */
@@ -106,7 +114,10 @@ def cargar_datos_disco():
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r") as f:
-                return json.load(f)
+                data = json.load(f)
+                if "prodes" not in data:
+                    data["prodes"] = {}
+                return data
         except Exception:
             pass
     return {
@@ -116,7 +127,8 @@ def cargar_datos_disco():
             'C': [f"Equipo C{i}" for i in range(1, 5)],
             'D': [f"Equipo D{i}" for i in range(1, 5)],
         },
-        "partidos": {}
+        "partidos": {},
+        "prodes": {}
     }
 
 def guardar_datos_disco(data):
@@ -126,6 +138,10 @@ def guardar_datos_disco(data):
     except Exception as e:
         st.error(f"Error al guardar datos: {e}")
 
+# Validación estricta de goles: solo números de 1 o 2 cifras
+def es_gol_valido(val):
+    return val == "" or (val.isdigit() and 1 <= len(val) <= 2)
+
 # Cargar datos al iniciar la app
 if 'torneo_data' not in st.session_state:
     st.session_state.torneo_data = cargar_datos_disco()
@@ -133,14 +149,13 @@ if 'torneo_data' not in st.session_state:
 if 'es_editor' not in st.session_state:
     st.session_state.es_editor = False
 
-# INICIALIZAMOS CON 'login' COMO PRIMERA PANTALLA
 if 'fase_actual' not in st.session_state:
     st.session_state.fase_actual = 'login'
 
 equipos = st.session_state.torneo_data["equipos"]
 datos_db = st.session_state.torneo_data["partidos"]
 
-# Header Principal (Se muestra en todas las pantallas)
+# Header Principal
 role_class = "role-editor" if st.session_state.es_editor else "role-viewer"
 role_text = f"ADMIN: {st.session_state.get('usuario_admin', '')}" if st.session_state.es_editor else "MODO ESPECTADOR"
 
@@ -152,21 +167,136 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ------------------------------------------
-# 0. PANTALLA INICIAL: INICIO DE SESIÓN
+# CÁLCULO DE PUNTUACIÓN DEL PRODE (AVANZADO)
+# ------------------------------------------
+def calcular_puntuacion_prodes():
+    resultados_reales = st.session_state.torneo_data["partidos"]
+    prodes_guardados = st.session_state.torneo_data.get("prodes", {})
+    ranking = []
+
+    for participante, preds in prodes_guardados.items():
+        total_pts = 0
+        for g_code in ['A', 'B', 'C', 'D']:
+            for m_idx in range(6):
+                k1 = f"G_{g_code}_{m_idx}_1"
+                k2 = f"G_{g_code}_{m_idx}_2"
+                
+                p1 = preds.get(k1, "")
+                p2 = preds.get(k2, "")
+                r1 = resultados_reales.get(k1, "")
+                r2 = resultados_reales.get(k2, "")
+                
+                if p1.isdigit() and p2.isdigit() and r1.isdigit() and r2.isdigit():
+                    p_g1, p_g2 = int(p1), int(p2)
+                    r_g1, r_g2 = int(r1), int(r2)
+                    
+                    p_res = 1 if p_g1 > p_g2 else (-1 if p_g1 < p_g2 else 0)
+                    r_res = 1 if r_g1 > r_g2 else (-1 if r_g1 < r_g2 else 0)
+                    
+                    p_btts = (p_g1 > 0 and p_g2 > 0)
+                    r_btts = (r_g1 > 0 and r_g2 > 0)
+                    
+                    # 1. Resultado Exacto (6 puntos)
+                    if p_g1 == r_g1 and p_g2 == r_g2:
+                        total_pts += 6
+                    else:
+                        # 2. Ganador o Empate correcto
+                        if p_res == r_res:
+                            # Si además acierta la diferencia de goles exacta (4 pts), sino gana 2 pts
+                            if (p_g1 - p_g2) == (r_g1 - r_g2):
+                                total_pts += 4
+                            else:
+                                total_pts += 2
+                        
+                        # 3. Bono "Ambos Marcan" (+1 punto extra si adivinó si ambos metían gol)
+                        if p_btts == r_btts:
+                            total_pts += 1
+                            
+        ranking.append({"Participante": participante, "Puntos": total_pts})
+    
+    df_ranking = pd.DataFrame(ranking)
+    if not df_ranking.empty:
+        df_ranking = df_ranking.sort_values(by="Puntos", ascending=False).reset_index(drop=True)
+    return df_ranking
+
+# ------------------------------------------
+# 0. PANTALLA INICIAL: INICIO DE SESIÓN Y PRODE
 # ------------------------------------------
 if st.session_state.fase_actual == 'login':
-    st.markdown("<h4 style='text-align: center; color: #d4af37; margin-top: 15px;'>Bienvenido al Torneo</h4>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; font-size: 0.85rem; color: #8b949e; margin-bottom: 20px;'>Seleccioná cómo querés ingresar al sistema</p>", unsafe_allow_html=True)
-
-    tab_invitado, tab_admin = st.tabs(["👁️ Modo Invitado", "🔐 Modo Administrador"])
+    st.markdown("<h4 style='text-align: center; color: #d4af37; margin-top: 10px;'>Menú Principal</h4>", unsafe_allow_html=True)
+    
+    tab_invitado, tab_prode, tab_admin = st.tabs(["👁️ Invitado", "🔮 Prode", "🔐 Admin"])
 
     with tab_invitado:
-        st.info("Podrás ver las tablas de posiciones y los resultados actualizados en tiempo real sin posibilidad de modificarlos.")
-        if st.button("🚀 Entrar como Invitado", use_container_width=True, type="primary"):
+        st.info("Ingresá para ver las tablas de posiciones y los partidos actualizados en tiempo real.")
+        if st.button("🚀 Entrar al Torneo", use_container_width=True, type="primary"):
             st.session_state.es_editor = False
             st.session_state.usuario_admin = None
             st.session_state.fase_actual = 'torneo'
             st.rerun()
+
+    with tab_prode:
+        st.markdown("#### 🔮 Simulador Prode")
+        
+        # Instrucciones de Puntaje Detalladas
+        st.markdown("""
+            > 📌 **Sistema de Puntos del Prode:**
+            > * 🎯 **Resultado Exacto:** **6 puntos** (¡Marcador perfecto!).
+            > * ⚽ **Ganador + Diferencia de Gol:** **4 puntos** (Acertaste el ganador y por cuántos goles de diferencia, ej: pronosticaste 2-0 y salió 3-1).
+            > * ✅ **Ganador o Empate Correcto:** **2 puntos** (Adivinaste qué equipo ganaba o si empataban).
+            > * 🔥 **Bono "Ambos Marcan":** **+1 punto extra** si acertaste si ambos equipos convertían goles (o si alguno terminaba con el arco en cero).
+        """)
+        
+        nombre_prode = st.text_input("Tu Nombre / Apodo:", key="input_nombre_prode", placeholder="Ej. JuanB")
+        
+        if nombre_prode.strip() != "":
+            user_preds = st.session_state.torneo_data.get("prodes", {}).get(nombre_prode.strip(), {}).copy()
+            
+            st.markdown("---")
+            st.markdown("<div style='font-size:0.85rem; color:#d4af37; font-weight:bold;'>Pronósticos Fase de Grupos:</div>", unsafe_allow_html=True)
+            
+            nuevas_preds = user_preds.copy()
+            for g_code in ['A', 'B', 'C', 'D']:
+                with st.expander(f"Grupo {g_code}"):
+                    eqs_c = equipos[g_code]
+                    fechas_cruces = [
+                        ("Fecha 1", [(eqs_c[0], eqs_c[1]), (eqs_c[2], eqs_c[3])]),
+                        ("Fecha 2", [(eqs_c[0], eqs_c[2]), (eqs_c[1], eqs_c[3])]),
+                        ("Fecha 3", [(eqs_c[0], eqs_c[3]), (eqs_c[1], eqs_c[2])])
+                    ]
+                    m_counter = 0
+                    for f_nombre, cruces in fechas_cruces:
+                        st.markdown(f"<div class='fecha-header'>{f_nombre}</div>", unsafe_allow_html=True)
+                        for eq1_c, eq2_c in cruces:
+                            k1 = f"G_{g_code}_{m_counter}_1"
+                            k2 = f"G_{g_code}_{m_counter}_2"
+                            v1_p = nuevas_preds.get(k1, "")
+                            v2_p = nuevas_preds.get(k2, "")
+                            
+                            st.markdown(f"<div style='font-size:0.85rem; font-weight:bold; margin-bottom:2px;'>{eq1_c} vs {eq2_c}</div>", unsafe_allow_html=True)
+                            c1, c2 = st.columns(2)
+                            p1 = c1.text_input("P1", value=v1_p, key=f"prode_{k1}", max_chars=2, placeholder="-", label_visibility="collapsed")
+                            p2 = c2.text_input("P2", value=v2_p, key=f"prode_{k2}", max_chars=2, placeholder="-", label_visibility="collapsed")
+                            
+                            if es_gol_valido(p1): nuevas_preds[k1] = p1
+                            if es_gol_valido(p2): nuevas_preds[k2] = p2
+                            
+                            m_counter += 1
+            
+            if st.button("💾 Guardar Mis Pronósticos", use_container_width=True, type="primary"):
+                if "prodes" not in st.session_state.torneo_data:
+                    st.session_state.torneo_data["prodes"] = {}
+                st.session_state.torneo_data["prodes"][nombre_prode.strip()] = nuevas_preds
+                guardar_datos_disco(st.session_state.torneo_data)
+                st.success(f"¡Pronósticos guardados correctamente para {nombre_prode.strip()}!")
+        
+        st.markdown("---")
+        st.markdown("##### 🏆 Tabla de Posiciones del Prode")
+        df_ranking = calcular_puntuacion_prodes()
+        if not df_ranking.empty:
+            st.dataframe(df_ranking, use_container_width=True)
+        else:
+            st.info("Aún no hay participantes registrados con pronósticos.")
 
     with tab_admin:
         user_select = st.selectbox(
@@ -229,6 +359,68 @@ else:
     tablas_datos = {g: {eq: {'PTS': 0, 'PJ': 0, 'PG': 0, 'PE': 0, 'PP': 0, 'GF': 0, 'GC': 0, 'DG': 0} 
                        for eq in equipos[g]} for g in ['A', 'B', 'C', 'D']}
 
+    # Función de ordenamiento con Criterio de Desempate Olímpico (Duelo entre sí)
+    def obtener_equipos_ordenados(g_code, tablas_dict, datos_partidos, equipos_dict):
+        eqs = equipos_dict[g_code]
+        match_pairs = [
+            (eqs[0], eqs[1], 0),
+            (eqs[2], eqs[3], 1),
+            (eqs[0], eqs[2], 2),
+            (eqs[1], eqs[3], 3),
+            (eqs[0], eqs[3], 4),
+            (eqs[1], eqs[2], 5),
+        ]
+        
+        def obtener_resultado_match(m_idx):
+            k1 = f"G_{g_code}_{m_idx}_1"
+            k2 = f"G_{g_code}_{m_idx}_2"
+            v1 = datos_partidos.get(k1, "")
+            v2 = datos_partidos.get(k2, "")
+            if v1.isdigit() and v2.isdigit():
+                return int(v1), int(v2)
+            return None, None
+
+        initial_sorted = sorted(eqs, key=lambda eq: tablas_dict[g_code][eq]['PTS'], reverse=True)
+        
+        final_sorted = []
+        for pts, group in groupby(initial_sorted, key=lambda eq: tablas_dict[g_code][eq]['PTS']):
+            tied_teams = list(group)
+            if len(tied_teams) > 1:
+                mini_stats = {eq: {'PTS': 0, 'DG': 0, 'GF': 0, 'GC': 0} for eq in tied_teams}
+                for teamA, teamB, m_idx in match_pairs:
+                    if teamA in tied_teams and teamB in tied_teams:
+                        gA, gB = obtener_resultado_match(m_idx)
+                        if gA is not None and gB is not None:
+                            mini_stats[teamA]['GF'] += gA
+                            mini_stats[teamA]['GC'] += gB
+                            mini_stats[teamB]['GF'] += gB
+                            mini_stats[teamB]['GC'] += gA
+                            mini_stats[teamA]['DG'] = mini_stats[teamA]['GF'] - mini_stats[teamA]['GC']
+                            mini_stats[teamB]['DG'] = mini_stats[teamB]['GF'] - mini_stats[teamB]['GC']
+                            if gA > gB:
+                                mini_stats[teamA]['PTS'] += 3
+                            elif gB > gA:
+                                mini_stats[teamB]['PTS'] += 3
+                            else:
+                                mini_stats[teamA]['PTS'] += 1
+                                mini_stats[teamB]['PTS'] += 1
+                
+                tied_sorted = sorted(
+                    tied_teams,
+                    key=lambda eq: (
+                        mini_stats[eq]['PTS'],
+                        mini_stats[eq]['DG'],
+                        mini_stats[eq]['GF'],
+                        tablas_dict[g_code][eq]['DG'],
+                        tablas_dict[g_code][eq]['GF']
+                    ),
+                    reverse=True
+                )
+                final_sorted.extend(tied_sorted)
+            else:
+                final_sorted.extend(tied_teams)
+        return final_sorted
+
     with tab_grupos:
         g_selected = st.radio("📌 Seleccionar Grupo:", ["Grupo A", "Grupo B", "Grupo C", "Grupo D"], horizontal=True, key="radio_grupo")
         g = g_selected[-1]
@@ -254,15 +446,15 @@ else:
                         st.markdown(f"<div style='font-size:0.85rem; font-weight:bold; margin-bottom:2px;'>{eq1_c} vs {eq2_c}</div>", unsafe_allow_html=True)
                         c1, c2 = st.columns(2)
                         
-                        in_g1 = c1.text_input("G1", value=val_g1, key=f"ui_{key_g1}", placeholder=f"Goles {eq1_c}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
-                        in_g2 = c2.text_input("G2", value=val_g2, key=f"ui_{key_g2}", placeholder=f"Goles {eq2_c}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                        in_g1 = c1.text_input("G1", value=val_g1, key=f"ui_{key_g1}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                        in_g2 = c2.text_input("G2", value=val_g2, key=f"ui_{key_g2}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                         if st.session_state.es_editor:
                             hubo_cambio = False
-                            if in_g1 != val_g1:
+                            if in_g1 != val_g1 and es_gol_valido(in_g1):
                                 st.session_state.torneo_data["partidos"][key_g1] = in_g1
                                 hubo_cambio = True
-                            if in_g2 != val_g2:
+                            if in_g2 != val_g2 and es_gol_valido(in_g2):
                                 st.session_state.torneo_data["partidos"][key_g2] = in_g2
                                 hubo_cambio = True
                             if hubo_cambio:
@@ -294,14 +486,13 @@ else:
 
         st.markdown(f"#### 📋 Tabla de Posiciones - Grupo {g}")
         df = pd.DataFrame.from_dict(tablas_datos[g], orient='index')
-        df = df.sort_values(by=['PTS', 'DG', 'GF'], ascending=False)
+        orden_grupo_actual = obtener_equipos_ordenados(g, tablas_datos, datos_db, equipos)
+        df = df.reindex(orden_grupo_actual)
         st.dataframe(df[['PTS', 'PJ', 'DG', 'GF', 'GC']], use_container_width=True)
 
         clasificados_lib, clasificados_sud = {}, {}
         for g_c in ['A', 'B', 'C', 'D']:
-            df_c = pd.DataFrame.from_dict(tablas_datos[g_c], orient='index')
-            df_c = df_c.sort_values(by=['PTS', 'DG', 'GF'], ascending=False)
-            equipos_ordenados = df_c.index.tolist()
+            equipos_ordenados = obtener_equipos_ordenados(g_c, tablas_datos, datos_db, equipos)
             clasificados_lib[g_c] = [equipos_ordenados[0], equipos_ordenados[1]]
             clasificados_sud[g_c] = [equipos_ordenados[2], equipos_ordenados[3]]
 
@@ -343,20 +534,20 @@ else:
             if es_doble:
                 st.markdown("<div class='input-label-row'>⚽ Partido de Ida</div>", unsafe_allow_html=True)
                 c1, c2 = st.columns(2)
-                ui_i1 = c1.text_input("I1", value=i1, key=f"ui_{k_i1}", placeholder=f"Goles {eq1}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
-                ui_i2 = c2.text_input("I2", value=i2, key=f"ui_{k_i2}", placeholder=f"Goles {eq2}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_i1 = c1.text_input("I1", value=i1, key=f"ui_{k_i1}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_i2 = c2.text_input("I2", value=i2, key=f"ui_{k_i2}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                 st.markdown("<div class='input-label-row'>⚽ Partido de Vuelta</div>", unsafe_allow_html=True)
                 c3, c4 = st.columns(2)
-                ui_v1 = c3.text_input("V1", value=v1, key=f"ui_{k_v1}", placeholder=f"Goles {eq1}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
-                ui_v2 = c4.text_input("V2", value=v2, key=f"ui_{k_v2}", placeholder=f"Goles {eq2}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_v1 = c3.text_input("V1", value=v1, key=f"ui_{k_v1}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_v2 = c4.text_input("V2", value=v2, key=f"ui_{k_v2}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                 if st.session_state.es_editor:
                     hubo_cambio = False
-                    if ui_i1 != i1: st.session_state.torneo_data["partidos"][k_i1] = ui_i1; hubo_cambio = True
-                    if ui_i2 != i2: st.session_state.torneo_data["partidos"][k_i2] = ui_i2; hubo_cambio = True
-                    if ui_v1 != v1: st.session_state.torneo_data["partidos"][k_v1] = ui_v1; hubo_cambio = True
-                    if ui_v2 != v2: st.session_state.torneo_data["partidos"][k_v2] = ui_v2; hubo_cambio = True
+                    if ui_i1 != i1 and es_gol_valido(ui_i1): st.session_state.torneo_data["partidos"][k_i1] = ui_i1; hubo_cambio = True
+                    if ui_i2 != i2 and es_gol_valido(ui_i2): st.session_state.torneo_data["partidos"][k_i2] = ui_i2; hubo_cambio = True
+                    if ui_v1 != v1 and es_gol_valido(ui_v1): st.session_state.torneo_data["partidos"][k_v1] = ui_v1; hubo_cambio = True
+                    if ui_v2 != v2 and es_gol_valido(ui_v2): st.session_state.torneo_data["partidos"][k_v2] = ui_v2; hubo_cambio = True
                     if hubo_cambio:
                         guardar_datos_disco(st.session_state.torneo_data)
                         st.rerun()
@@ -364,13 +555,13 @@ else:
             else:
                 st.markdown("<div class='input-label-row'>👑 Gran Final Única</div>", unsafe_allow_html=True)
                 c1, c2 = st.columns(2)
-                ui_i1 = c1.text_input("I1", value=i1, key=f"ui_{k_i1}", placeholder=f"Goles {eq1}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
-                ui_i2 = c2.text_input("I2", value=i2, key=f"ui_{k_i2}", placeholder=f"Goles {eq2}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_i1 = c1.text_input("I1", value=i1, key=f"ui_{k_i1}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_i2 = c2.text_input("I2", value=i2, key=f"ui_{k_i2}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                 if st.session_state.es_editor:
                     hubo_cambio = False
-                    if ui_i1 != i1: st.session_state.torneo_data["partidos"][k_i1] = ui_i1; hubo_cambio = True
-                    if ui_i2 != i2: st.session_state.torneo_data["partidos"][k_i2] = ui_i2; hubo_cambio = True
+                    if ui_i1 != i1 and es_gol_valido(ui_i1): st.session_state.torneo_data["partidos"][k_i1] = ui_i1; hubo_cambio = True
+                    if ui_i2 != i2 and es_gol_valido(ui_i2): st.session_state.torneo_data["partidos"][k_i2] = ui_i2; hubo_cambio = True
                     if hubo_cambio:
                         guardar_datos_disco(st.session_state.torneo_data)
                         st.rerun()
@@ -468,7 +659,7 @@ else:
                     st.session_state.fase_actual = 'login'
                     st.rerun()
         else:
-            st.info("👤 Estás navegando como **Invitado (Sólo Lectura)**.")
-            if st.button("🔄 Volver al Inicio / Cambiar de Sesión", use_container_width=True):
+            st.info("👤 Estás navegando como **Invitado**.")
+            if st.button("🔄 Volver al Menú Principal / Prode", use_container_width=True):
                 st.session_state.fase_actual = 'login'
                 st.rerun()
