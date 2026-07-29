@@ -165,16 +165,20 @@ else:
         df = df.sort_values(by=['PTS', 'DG', 'GF'], ascending=False)
         st.dataframe(df[['PTS', 'PJ', 'DG', 'GF', 'GC']], use_container_width=True)
 
+        # CÁLCULO CORRECTO DE CLASIFICADOS SIN INDEX ERROR
         clasificados_lib, clasificados_sud = {}, {}
         for g_c in ['A', 'B', 'C', 'D']:
             df_c = pd.DataFrame.from_dict(tablas_datos[g_c], orient='index')
             df_c = df_c.sort_values(by=['PTS', 'DG', 'GF'], ascending=False)
-            clasificados_lib[g_c] = [df_c.index[0], df_c.index[1]]
-            clasificados_sud[g_c] = [df_c.index[2], df_c.index[3]]
+            
+            # Guardamos la lista entera de 4 equipos
+            equipos_ordenados = df_c.index.tolist()
+            clasificados_lib[g_c] = [equipos_ordenados[0], equipos_ordenados[1]] # 1° y 2° -> Libertadores
+            clasificados_sud[g_c] = [equipos_ordenados[2], equipos_ordenados[3]] # 3° y 4° -> Sudamericana
 
     # Función auxiliar para renderizar cada llave súper clara
     def renderizar_llave(copa_prefix, idx, eq1, eq2, es_doble=True):
-        st.markdown(f"<div class='bracket-card-{copa_prefix.lower()}'>", unsafe_allow_html=True)
+        st.markdown(f"<div class='bracket-card-{copa_prefix.lower()[:3]}'>", unsafe_allow_html=True)
         
         i1 = st.session_state.get(f"{copa_prefix}_{idx}_i1", "")
         i2 = st.session_state.get(f"{copa_prefix}_{idx}_i2", "")
@@ -188,9 +192,9 @@ else:
         if (i1.isdigit() and i2.isdigit()) and (not es_doble or (v1.isdigit() and v2.isdigit())):
             if tot1 > tot2: ganador = eq1
             elif tot2 > tot1: ganador = eq2
-            else: ganador = f"{eq1} (Penalties)"
+            else: ganador = f"{eq1} (Pen)"
 
-        # Estilos de ganadores
+        # Estilos de ganadores resaltados en verde
         st1 = "color:#2ea44f; font-weight:bold;" if ganador == eq1 else "font-weight:bold;"
         st2 = "color:#2ea44f; font-weight:bold;" if ganador == eq2 else "font-weight:bold;"
 
@@ -199,7 +203,7 @@ else:
                 <span style='font-size:0.8rem; color:#8b949e;'>Llave {idx+1}</span>
                 <span class='global-badge'>Global: {tot1} - {tot2}</span>
             </div>
-            <div style='display:flex; justify-content:space-between; margin-bottom:4px;'>
+            <div style='display:flex; justify-content:space-between; margin-bottom:6px;'>
                 <span style='{st1}'>{eq1}</span>
                 <span style='{st2}'>{eq2}</span>
             </div>
@@ -266,11 +270,12 @@ else:
 
         sub_sud_c, sub_sud_s, sub_sud_f = st.tabs(["🟦 Cuartos", "🔥 Semis", "👑 Final"])
 
+        # CRUCES CORRECTOS PARA EL 3° Y 4° DE CADA GRUPO
         cruces_sud = [
-            (clasificados_sud['A'][2], clasificados_sud['B'][3]),
-            (clasificados_sud['C'][2], clasificados_sud['D'][3]),
-            (clasificados_sud['B'][2], clasificados_sud['A'][3]),
-            (clasificados_sud['D'][2], clasificados_sud['C'][3])
+            (clasificados_sud['A'][0], clasificados_sud['B'][1]), # 3°A vs 4°B
+            (clasificados_sud['C'][0], clasificados_sud['D'][1]), # 3°C vs 4°D
+            (clasificados_sud['B'][0], clasificados_sud['A'][1]), # 3°B vs 4°A
+            (clasificados_sud['D'][0], clasificados_sud['C'][1])  # 3°D vs 4°C
         ]
         
         ganadores_cuartos_sud = []
