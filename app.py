@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-from supabase import create_client, Client
 
 # Configuración Móvil Estricta
 st.set_page_config(
@@ -9,18 +8,6 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="collapsed"
 )
-
-# Conexión a Base de Datos Supabase
-@st.cache_resource
-def init_supabase() -> Client:
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-    return create_client(url, key)
-
-try:
-    supabase = init_supabase()
-except Exception as e:
-    st.error("Error al conectar con Supabase. Revisá los Secrets en Streamlit Cloud.")
 
 # Custom CSS Optimizado para Móviles Táctiles
 st.markdown("""
@@ -108,42 +95,30 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# FUNCIONES BD SUPABASE
-def obtener_datos_db():
-    try:
-        res = supabase.table("torneo").select("*").execute()
-        return {row["id"]: row["valor"] for row in res.data}
-    except Exception:
-        return {}
-
-def guardar_dato_db(key_id, valor):
-    try:
-        supabase.table("torneo").upsert({"id": key_id, "valor": str(valor)}).execute()
-    except Exception as e:
-        st.error("Error al guardar en Supabase.")
-
-# Cargar base de datos
-datos_db = obtener_datos_db()
-
+# ------------------------------------------
+# INICIALIZACIÓN DE ALMACENAMIENTO EN MEMORIA
+# ------------------------------------------
 if 'es_editor' not in st.session_state:
     st.session_state.es_editor = False
-
-equipos_def = {
-    'A': [f"Equipo A{i}" for i in range(1, 5)],
-    'B': [f"Equipo B{i}" for i in range(1, 5)],
-    'C': [f"Equipo C{i}" for i in range(1, 5)],
-    'D': [f"Equipo D{i}" for i in range(1, 5)],
-}
-equipos = {}
-for g in ['A', 'B', 'C', 'D']:
-    equipos[g] = []
-    for i in range(4):
-        val = datos_db.get(f"eq_{g}_{i}", equipos_def[g][i])
-        equipos[g].append(val)
 
 if 'fase_actual' not in st.session_state:
     st.session_state.fase_actual = 'torneo'
 
+if 'datos_partidos' not in st.session_state:
+    st.session_state.datos_partidos = {}
+
+if 'equipos' not in st.session_state:
+    st.session_state.equipos = {
+        'A': [f"Equipo A{i}" for i in range(1, 5)],
+        'B': [f"Equipo B{i}" for i in range(1, 5)],
+        'C': [f"Equipo C{i}" for i in range(1, 5)],
+        'D': [f"Equipo D{i}" for i in range(1, 5)],
+    }
+
+equipos = st.session_state.equipos
+datos_db = st.session_state.datos_partidos
+
+# Header con Indicador de Sesión
 role_class = "role-editor" if st.session_state.es_editor else "role-viewer"
 role_text = f"ADMIN: {st.session_state.get('usuario_admin', '')}" if st.session_state.es_editor else "MODO ESPECTADOR"
 
@@ -160,7 +135,7 @@ with c_ref2:
         st.rerun()
 
 # ------------------------------------------
-# 1. PANTALLA CONFIGURACIÓN
+# 1. PANTALLA CONFIGURACIÓN DE EQUIPOS
 # ------------------------------------------
 if st.session_state.fase_actual == 'config' and st.session_state.es_editor:
     st.subheader("⚙️ Configuración de Equipos")
@@ -173,8 +148,7 @@ if st.session_state.fase_actual == 'config' and st.session_state.es_editor:
             equipos[g_key][i], 
             key=f"cfg_{g_key}_{i}"
         )
-        if nuevo_nombre != equipos[g_key][i]:
-            guardar_dato_db(f"eq_{g_key}_{i}", nuevo_nombre)
+        st.session_state.equipos[g_key][i] = nuevo_nombre
 
     st.markdown("---")
     if st.button("🚀 GUARDAR Y VOLVER AL TORNEO", use_container_width=True, type="primary"):
@@ -182,7 +156,7 @@ if st.session_state.fase_actual == 'config' and st.session_state.es_editor:
         st.rerun()
 
 # ------------------------------------------
-# 2. DASHBOARD TORNEO
+# 2. DASHBOARD TORNEO (GRUPOS & LLAVES)
 # ------------------------------------------
 else:
     tab_grupos, tab_lib, tab_sud = st.tabs(["📊 Grupos", "🏆 Libertadores", "🥈 Sudamericana"])
@@ -219,8 +193,8 @@ else:
                         in_g2 = c2.text_input("G2", value=val_g2, key=f"ui_{key_g2}", placeholder=f"Goles {eq2_c}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                         if st.session_state.es_editor:
-                            if in_g1 != val_g1: guardar_dato_db(key_g1, in_g1); st.rerun()
-                            if in_g2 != val_g2: guardar_dato_db(key_g2, in_g2); st.rerun()
+                            st.session_state.datos_partidos[key_g1] = in_g1
+                            st.session_state.datos_partidos[key_g2] = in_g2
 
                         g1_in, g2_in = in_g1, in_g2
                     else:
@@ -258,6 +232,7 @@ else:
             clasificados_lib[g_c] = [equipos_ordenados[0], equipos_ordenados[1]]
             clasificados_sud[g_c] = [equipos_ordenados[2], equipos_ordenados[3]]
 
+    # Función para renderizar cruces de eliminatoria
     def renderizar_llave_movil(copa_prefix, idx, eq1, eq2, es_doble=True):
         css_class = "match-card-lib" if "LIB" in copa_prefix else "match-card-sud"
         
@@ -304,10 +279,8 @@ else:
                 ui_v2 = c4.text_input("V2", value=v2, key=f"ui_{k_v2}", placeholder=f"Goles {eq2}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                 if st.session_state.es_editor:
-                    if ui_i1 != i1: guardar_dato_db(k_i1, ui_i1); st.rerun()
-                    if ui_i2 != i2: guardar_dato_db(k_i2, ui_i2); st.rerun()
-                    if ui_v1 != v1: guardar_dato_db(k_v1, ui_v1); st.rerun()
-                    if ui_v2 != v2: guardar_dato_db(k_v2, ui_v2); st.rerun()
+                    st.session_state.datos_partidos[k_i1], st.session_state.datos_partidos[k_i2] = ui_i1, ui_i2
+                    st.session_state.datos_partidos[k_v1], st.session_state.datos_partidos[k_v2] = ui_v1, ui_v2
 
             else:
                 st.markdown("<div class='input-label-row'>👑 Gran Final Única</div>", unsafe_allow_html=True)
@@ -316,8 +289,7 @@ else:
                 ui_i2 = c2.text_input("I2", value=i2, key=f"ui_{k_i2}", placeholder=f"Goles {eq2}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                 if st.session_state.es_editor:
-                    if ui_i1 != i1: guardar_dato_db(k_i1, ui_i1); st.rerun()
-                    if ui_i2 != i2: guardar_dato_db(k_i2, ui_i2); st.rerun()
+                    st.session_state.datos_partidos[k_i1], st.session_state.datos_partidos[k_i2] = ui_i1, ui_i2
 
             st.markdown("</div>", unsafe_allow_html=True)
         
@@ -393,6 +365,9 @@ else:
                 st.balloons()
                 st.info(f"🥈 ¡CAMPEÓN COPA SUDAMERICANA 2026: {campeon_sud}! 🥈")
 
+    # ------------------------------------------
+    # FOOTER DE AUTENTICACIÓN ADMIN MULTI-USUARIO
+    # ------------------------------------------
     st.markdown("---")
     with st.expander("🔐 Control de Administrador"):
         if not st.session_state.es_editor:
@@ -403,6 +378,7 @@ else:
             pin_input = st.text_input(f"Contraseña de {user_select}:", type="password")
             
             if st.button("Iniciar Sesión Admin", use_container_width=True):
+                # Contraseñas por defecto (podés cambiarlas en Secrets si querés)
                 pins = {
                     "admin": st.secrets.get("ADMIN_PIN", "admin123"),
                     "adminpausa": st.secrets.get("ADMIN_PAUSA_PIN", "pausa123"),
