@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import json
+import os
 
 # Configuración Móvil Estricta
 st.set_page_config(
@@ -96,27 +98,46 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------------------------------------
-# INICIALIZACIÓN DE ALMACENAMIENTO EN MEMORIA
+# MANEJO DE ARCHIVO PERSISTENTE JSON
 # ------------------------------------------
+DATA_FILE = "datos_torneo.json"
+
+def cargar_datos_disco():
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        "equipos": {
+            'A': [f"Equipo A{i}" for i in range(1, 5)],
+            'B': [f"Equipo B{i}" for i in range(1, 5)],
+            'C': [f"Equipo C{i}" for i in range(1, 5)],
+            'D': [f"Equipo D{i}" for i in range(1, 5)],
+        },
+        "partidos": {}
+    }
+
+def guardar_datos_disco(data):
+    try:
+        with open(DATA_FILE, "w") as f:
+            json.dump(data, f, indent=4)
+    except Exception as e:
+        st.error(f"Error al guardar datos: {e}")
+
+# Cargar datos al iniciar la app
+if 'torneo_data' not in st.session_state:
+    st.session_state.torneo_data = cargar_datos_disco()
+
 if 'es_editor' not in st.session_state:
     st.session_state.es_editor = False
 
 if 'fase_actual' not in st.session_state:
     st.session_state.fase_actual = 'torneo'
 
-if 'datos_partidos' not in st.session_state:
-    st.session_state.datos_partidos = {}
-
-if 'equipos' not in st.session_state:
-    st.session_state.equipos = {
-        'A': [f"Equipo A{i}" for i in range(1, 5)],
-        'B': [f"Equipo B{i}" for i in range(1, 5)],
-        'C': [f"Equipo C{i}" for i in range(1, 5)],
-        'D': [f"Equipo D{i}" for i in range(1, 5)],
-    }
-
-equipos = st.session_state.equipos
-datos_db = st.session_state.datos_partidos
+equipos = st.session_state.torneo_data["equipos"]
+datos_db = st.session_state.torneo_data["partidos"]
 
 # Header con Indicador de Sesión
 role_class = "role-editor" if st.session_state.es_editor else "role-viewer"
@@ -132,6 +153,7 @@ st.markdown(f"""
 c_ref1, c_ref2 = st.columns([7, 3])
 with c_ref2:
     if st.button("🔄 Actualizar", use_container_width=True):
+        st.session_state.torneo_data = cargar_datos_disco()
         st.rerun()
 
 # ------------------------------------------
@@ -148,7 +170,9 @@ if st.session_state.fase_actual == 'config' and st.session_state.es_editor:
             equipos[g_key][i], 
             key=f"cfg_{g_key}_{i}"
         )
-        st.session_state.equipos[g_key][i] = nuevo_nombre
+        if nuevo_nombre != equipos[g_key][i]:
+            st.session_state.torneo_data["equipos"][g_key][i] = nuevo_nombre
+            guardar_datos_disco(st.session_state.torneo_data)
 
     st.markdown("---")
     if st.button("🚀 GUARDAR Y VOLVER AL TORNEO", use_container_width=True, type="primary"):
@@ -193,8 +217,16 @@ else:
                         in_g2 = c2.text_input("G2", value=val_g2, key=f"ui_{key_g2}", placeholder=f"Goles {eq2_c}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                         if st.session_state.es_editor:
-                            st.session_state.datos_partidos[key_g1] = in_g1
-                            st.session_state.datos_partidos[key_g2] = in_g2
+                            hubo_cambio = False
+                            if in_g1 != val_g1:
+                                st.session_state.torneo_data["partidos"][key_g1] = in_g1
+                                hubo_cambio = True
+                            if in_g2 != val_g2:
+                                st.session_state.torneo_data["partidos"][key_g2] = in_g2
+                                hubo_cambio = True
+                            if hubo_cambio:
+                                guardar_datos_disco(st.session_state.torneo_data)
+                                st.rerun()
 
                         g1_in, g2_in = in_g1, in_g2
                     else:
@@ -279,8 +311,14 @@ else:
                 ui_v2 = c4.text_input("V2", value=v2, key=f"ui_{k_v2}", placeholder=f"Goles {eq2}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                 if st.session_state.es_editor:
-                    st.session_state.datos_partidos[k_i1], st.session_state.datos_partidos[k_i2] = ui_i1, ui_i2
-                    st.session_state.datos_partidos[k_v1], st.session_state.datos_partidos[k_v2] = ui_v1, ui_v2
+                    hubo_cambio = False
+                    if ui_i1 != i1: st.session_state.torneo_data["partidos"][k_i1] = ui_i1; hubo_cambio = True
+                    if ui_i2 != i2: st.session_state.torneo_data["partidos"][k_i2] = ui_i2; hubo_cambio = True
+                    if ui_v1 != v1: st.session_state.torneo_data["partidos"][k_v1] = ui_v1; hubo_cambio = True
+                    if ui_v2 != v2: st.session_state.torneo_data["partidos"][k_v2] = ui_v2; hubo_cambio = True
+                    if hubo_cambio:
+                        guardar_datos_disco(st.session_state.torneo_data)
+                        st.rerun()
 
             else:
                 st.markdown("<div class='input-label-row'>👑 Gran Final Única</div>", unsafe_allow_html=True)
@@ -289,7 +327,12 @@ else:
                 ui_i2 = c2.text_input("I2", value=i2, key=f"ui_{k_i2}", placeholder=f"Goles {eq2}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                 if st.session_state.es_editor:
-                    st.session_state.datos_partidos[k_i1], st.session_state.datos_partidos[k_i2] = ui_i1, ui_i2
+                    hubo_cambio = False
+                    if ui_i1 != i1: st.session_state.torneo_data["partidos"][k_i1] = ui_i1; hubo_cambio = True
+                    if ui_i2 != i2: st.session_state.torneo_data["partidos"][k_i2] = ui_i2; hubo_cambio = True
+                    if hubo_cambio:
+                        guardar_datos_disco(st.session_state.torneo_data)
+                        st.rerun()
 
             st.markdown("</div>", unsafe_allow_html=True)
         
@@ -352,7 +395,7 @@ else:
         ganadores_semis_sud = []
         with sub_sud_s:
             s_eq1, s_eq2 = ganadores_cuartos_sud[0], ganadores_cuartos_sud[1]
-            s_eq3, s_eq4 = ganadores_cuartos_sud[2], ganadores_cuartos_sud[3]
+            s_eq3, s_eq4 = ganadores_semis_sud[2], ganadores_semis_sud[3]
             
             g1 = renderizar_llave_movil("SUD_S", 0, s_eq1, s_eq2, es_doble=True)
             g2 = renderizar_llave_movil("SUD_S", 1, s_eq3, s_eq4, es_doble=True)
@@ -378,7 +421,6 @@ else:
             pin_input = st.text_input(f"Contraseña de {user_select}:", type="password")
             
             if st.button("Iniciar Sesión Admin", use_container_width=True):
-                # Contraseñas por defecto (podés cambiarlas en Secrets si querés)
                 pins = {
                     "admin": st.secrets.get("ADMIN_PIN", "admin123"),
                     "adminpausa": st.secrets.get("ADMIN_PAUSA_PIN", "pausa123"),
