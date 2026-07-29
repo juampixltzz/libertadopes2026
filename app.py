@@ -27,7 +27,7 @@ st.markdown("""
 
     .block-container { padding-top: 0.5rem !important; padding-bottom: 2rem !important; }
     
-    /* Inputs de Marcador - Optimizados para numérico corto */
+    /* Inputs de Marcador */
     div[data-baseweb="input"] input {
         text-align: center !important;
         font-weight: 800 !important;
@@ -36,13 +36,6 @@ st.markdown("""
         border-radius: 6px !important;
         font-size: 1rem !important;
         padding: 4px !important;
-    }
-
-    /* Ocultar flechas numéricas en móviles/navegadores */
-    input[type=number]::-webkit-inner-spin-button, 
-    input[type=number]::-webkit-outer-spin-button { 
-        -webkit-appearance: none; 
-        margin: 0; 
     }
 
     /* Badges de Títulos */
@@ -132,10 +125,6 @@ def guardar_datos_disco(data):
             json.dump(data, f, indent=4)
     except Exception as e:
         st.error(f"Error al guardar datos: {e}")
-
-# Función para validar solo números de 1 o 2 cifras
-def es_gol_valido(val):
-    return val == "" or (val.isdigit() and 1 <= len(val) <= 2)
 
 # Cargar datos al iniciar la app
 if 'torneo_data' not in st.session_state:
@@ -265,15 +254,15 @@ else:
                         st.markdown(f"<div style='font-size:0.85rem; font-weight:bold; margin-bottom:2px;'>{eq1_c} vs {eq2_c}</div>", unsafe_allow_html=True)
                         c1, c2 = st.columns(2)
                         
-                        in_g1 = c1.text_input("G1", value=val_g1, key=f"ui_{key_g1}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
-                        in_g2 = c2.text_input("G2", value=val_g2, key=f"ui_{key_g2}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                        in_g1 = c1.text_input("G1", value=val_g1, key=f"ui_{key_g1}", placeholder=f"Goles {eq1_c}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                        in_g2 = c2.text_input("G2", value=val_g2, key=f"ui_{key_g2}", placeholder=f"Goles {eq2_c}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                         if st.session_state.es_editor:
                             hubo_cambio = False
-                            if in_g1 != val_g1 and es_gol_valido(in_g1):
+                            if in_g1 != val_g1:
                                 st.session_state.torneo_data["partidos"][key_g1] = in_g1
                                 hubo_cambio = True
-                            if in_g2 != val_g2 and es_gol_valido(in_g2):
+                            if in_g2 != val_g2:
                                 st.session_state.torneo_data["partidos"][key_g2] = in_g2
                                 hubo_cambio = True
                             if hubo_cambio:
@@ -354,20 +343,20 @@ else:
             if es_doble:
                 st.markdown("<div class='input-label-row'>⚽ Partido de Ida</div>", unsafe_allow_html=True)
                 c1, c2 = st.columns(2)
-                ui_i1 = c1.text_input("I1", value=i1, key=f"ui_{k_i1}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
-                ui_i2 = c2.text_input("I2", value=i2, key=f"ui_{k_i2}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_i1 = c1.text_input("I1", value=i1, key=f"ui_{k_i1}", placeholder=f"Goles {eq1}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_i2 = c2.text_input("I2", value=i2, key=f"ui_{k_i2}", placeholder=f"Goles {eq2}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                 st.markdown("<div class='input-label-row'>⚽ Partido de Vuelta</div>", unsafe_allow_html=True)
                 c3, c4 = st.columns(2)
-                ui_v1 = c3.text_input("V1", value=v1, key=f"ui_{k_v1}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
-                ui_v2 = c4.text_input("V2", value=v2, key=f"ui_{k_v2}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_v1 = c3.text_input("V1", value=v1, key=f"ui_{k_v1}", placeholder=f"Goles {eq1}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_v2 = c4.text_input("V2", value=v2, key=f"ui_{k_v2}", placeholder=f"Goles {eq2}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                 if st.session_state.es_editor:
                     hubo_cambio = False
-                    if ui_i1 != i1 and es_gol_valido(ui_i1): st.session_state.torneo_data["partidos"][k_i1] = ui_i1; hubo_cambio = True
-                    if ui_i2 != i2 and es_gol_valido(ui_i2): st.session_state.torneo_data["partidos"][k_i2] = ui_i2; hubo_cambio = True
-                    if ui_v1 != v1 and es_gol_valido(ui_v1): st.session_state.torneo_data["partidos"][k_v1] = ui_v1; hubo_cambio = True
-                    if ui_v2 != v2 and es_gol_valido(ui_v2): st.session_state.torneo_data["partidos"][k_v2] = ui_v2; hubo_cambio = True
+                    if ui_i1 != i1: st.session_state.torneo_data["partidos"][k_i1] = ui_i1; hubo_cambio = True
+                    if ui_i2 != i2: st.session_state.torneo_data["partidos"][k_i2] = ui_i2; hubo_cambio = True
+                    if ui_v1 != v1: st.session_state.torneo_data["partidos"][k_v1] = ui_v1; hubo_cambio = True
+                    if ui_v2 != v2: st.session_state.torneo_data["partidos"][k_v2] = ui_v2; hubo_cambio = True
                     if hubo_cambio:
                         guardar_datos_disco(st.session_state.torneo_data)
                         st.rerun()
@@ -375,13 +364,13 @@ else:
             else:
                 st.markdown("<div class='input-label-row'>👑 Gran Final Única</div>", unsafe_allow_html=True)
                 c1, c2 = st.columns(2)
-                ui_i1 = c1.text_input("I1", value=i1, key=f"ui_{k_i1}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
-                ui_i2 = c2.text_input("I2", value=i2, key=f"ui_{k_i2}", max_chars=2, placeholder="-", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_i1 = c1.text_input("I1", value=i1, key=f"ui_{k_i1}", placeholder=f"Goles {eq1}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
+                ui_i2 = c2.text_input("I2", value=i2, key=f"ui_{k_i2}", placeholder=f"Goles {eq2}", label_visibility="collapsed", disabled=not st.session_state.es_editor)
 
                 if st.session_state.es_editor:
                     hubo_cambio = False
-                    if ui_i1 != i1 and es_gol_valido(ui_i1): st.session_state.torneo_data["partidos"][k_i1] = ui_i1; hubo_cambio = True
-                    if ui_i2 != i2 and es_gol_valido(ui_i2): st.session_state.torneo_data["partidos"][k_i2] = ui_i2; hubo_cambio = True
+                    if ui_i1 != i1: st.session_state.torneo_data["partidos"][k_i1] = ui_i1; hubo_cambio = True
+                    if ui_i2 != i2: st.session_state.torneo_data["partidos"][k_i2] = ui_i2; hubo_cambio = True
                     if hubo_cambio:
                         guardar_datos_disco(st.session_state.torneo_data)
                         st.rerun()
